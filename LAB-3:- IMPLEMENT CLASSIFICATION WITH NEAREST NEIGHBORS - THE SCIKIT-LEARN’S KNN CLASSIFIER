@@ -6,47 +6,30 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, classification_report
 
-# Load the California Housing Dataset
+# Load and preprocess data
 california_housing = fetch_california_housing()
 X = california_housing.data
-y = california_housing.target
+y = (california_housing.target > np.median(california_housing.target)).astype(int)
 
-# Convert target variable into binary classification
-threshold = np.median(y)
-y_binary = (y > threshold).astype(int)
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-# Split the data into training and test sets with stratification to maintain the proportion of classes
-X_train, X_test, y_train, y_test = train_test_split(X, y_binary, test_size=0.2, random_state=42, stratify=y_binary)
-
-# Feature scaling
+# Scale features
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# Create a KNN classifier with a different number of neighbors
-knn = KNeighborsClassifier(n_neighbors=7)  # Changed from 5 to 7
-# Train the classifier
+# Train and evaluate model
+knn = KNeighborsClassifier(n_neighbors=7)
 knn.fit(X_train_scaled, y_train)
-# Predict labels for the test set
 y_pred = knn.predict(X_test_scaled)
 
-# Calculate confusion matrix
-cm = confusion_matrix(y_test, y_pred)
-print("Confusion matrix")
-print(cm)
-
-# Generate classification report
+# Print confusion matrix and classification report
+print("Confusion matrix\n", confusion_matrix(y_test, y_pred))
 report = classification_report(y_test, y_pred, target_names=['Low', 'High'], output_dict=True)
-
-# Print classification report in a formatted way
 print("\nClassification report:")
 print("precision recall f1-score support")
-
-# Print metrics for each class
-for label in ['Low', 'High']:
-    metrics = report[label]
-    print(f"{label} {metrics['precision']:.2f} {metrics['recall']:.2f} {metrics['f1-score']:.2f} {metrics['support']}")
-
-# Print average / total metrics
-avg_total = report['macro avg']
-print(f"avg / total {avg_total['precision']:.2f} {avg_total['recall']:.2f} {avg_total['f1-score']:.2f} {int(avg_total['support'])}")
+for label, metrics in report.items():
+    if label in ['Low', 'High']:
+        print(f"{label} {metrics['precision']:.2f} {metrics['recall']:.2f} {metrics['f1-score']:.2f} {metrics['support']}")
+print(f"avg / total {report['macro avg']['precision']:.2f} {report['macro avg']['recall']:.2f} {report['macro avg']['f1-score']:.2f} {int(report['macro avg']['support'])}")
