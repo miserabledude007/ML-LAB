@@ -5,83 +5,55 @@ from tensorflow.keras import layers
 from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
 
-# Load dataset
-train_df = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/california_housing_train.csv")
+# Load and shuffle dataset
+train_df = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/california_housing_train.csv").sample(frac=1, random_state=42)
 test_df = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/california_housing_test.csv")
 
-# Shuffle the training set
-train_df = train_df.reindex(np.random.permutation(train_df.index))
+# Normalize data
+train_mean, train_std = train_df.mean(), train_df.std()
+test_mean, test_std = test_df.mean(), test_df.std()
+train_df_norm = (train_df - train_mean) / train_std
+test_df_norm = (test_df - test_mean) / test_std
 
-# Normalize the training set
-train_df_mean = train_df.mean()
-train_df_std = train_df.std()
-train_df_norm = (train_df - train_df_mean) / train_df_std
-
-# Normalize the test set
-test_df_mean = test_df.mean()
-test_df_std = test_df.std()
-test_df_norm = (test_df - test_df_mean) / test_df_std
-
-# Define the threshold for classification
+# Define binary labels
 threshold = 265000
 train_df_norm["median_house_value_is_high"] = (train_df["median_house_value"] > threshold).astype(float)
 test_df_norm["median_house_value_is_high"] = (test_df["median_house_value"] > threshold).astype(float)
 
-# Define inputs for the model
-inputs = {
-    'median_income': tf.keras.Input(shape=(1,)),
-    'total_rooms': tf.keras.Input(shape=(1,))
-}
-
-# Create the model
-def create_model(my_inputs, my_learning_rate, METRICS):
-    concatenated_inputs = tf.keras.layers.Concatenate()(my_inputs.values())
-    dense = layers.Dense(units=1, activation='sigmoid')(concatenated_inputs)
-    model = tf.keras.Model(inputs=my_inputs, outputs=dense)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=my_learning_rate),
-                  loss=tf.keras.losses.BinaryCrossentropy(),
-                  metrics=METRICS)
+# Define and create the model
+def create_model(input_shapes, lr):
+    inputs = {name: tf.keras.Input(shape=(shape,), name=name) for name, shape in input_shapes.items()}
+    concatenated_inputs = layers.Concatenate()(list(inputs.values()))
+    outputs = layers.Dense(1, activation='sigmoid')(concatenated_inputs)
+    model = tf.keras.Model(inputs=list(inputs.values()), outputs=outputs)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+                  loss='binary_crossentropy',
+                  metrics=[
+                      tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=0.35),
+                      tf.keras.metrics.Precision(thresholds=0.35, name='precision'),
+                      tf.keras.metrics.Recall(thresholds=0.35, name='recall'),
+                      tf.keras.metrics.AUC(name='auc')
+                  ])
     return model
 
-# Train the model
-def train_model(model, dataset, epochs, label_name, batch_size=None, shuffle=True):
-    features = {name: np.array(value) for name, value in dataset.items()}
-    label = np.array(features.pop(label_name))
-    history = model.fit(x=features, y=label, batch_size=batch_size, epochs=epochs, shuffle=shuffle, verbose=0)
-    epochs = history.epoch
-    hist = pd.DataFrame(history.history)
-    return epochs, hist
-
-# Define hyperparameters and metrics
-learning_rate = 0.001
-epochs = 30
-batch_size = 100
-label_name = "median_house_value_is_high"
-classification_threshold = 0.35
-METRICS = [
-    tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=classification_threshold),
-    tf.keras.metrics.Precision(thresholds=classification_threshold, name='precision'),
-    tf.keras.metrics.Recall(thresholds=classification_threshold, name='recall'),
-    tf.keras.metrics.AUC(name='auc')
-]
+# Prepare data for training and evaluation
+input_shapes = {'median_income': 1, 'total_rooms': 1}
+features_train = {name: np.array(train_df_norm[name]) for name in input_shapes}
+features_test = {name: np.array(test_df_norm[name]) for name in input_shapes}
+label_train = np.array(train_df_norm.pop('median_house_value_is_high'))
+label_test = np.array(test_df_norm.pop('median_house_value_is_high'))
 
 # Create and train the model
-my_model = create_model(inputs, learning_rate, METRICS)
-epochs, hist = train_model(my_model, train_df_norm, epochs, label_name, batch_size)
+model = create_model(input_shapes, lr=0.001)
+history = model.fit(x=features_train, y=label_train, epochs=30, batch_size=100, verbose=0)
 
-# Evaluate model on test set
-features = {name: np.array(value) for name, value in test_df_norm.items()}
-label = np.array(features.pop(label_name))
-y_pred_prob = my_model.predict(features)
-
-# Calculate ROC curve and AUC
-fpr, tpr, _ = roc_curve(label, y_pred_prob)
+# Evaluate model
+y_pred_prob = model.predict(features_test).ravel()
+fpr, tpr, _ = roc_curve(label_test, y_pred_prob)
 roc_auc = auc(fpr, tpr)
 
-# Print final metric values
+# Print and plot results
 print(f"Final Metric Values - AUC: {roc_auc:.3f}")
-
-# Plot ROC curve
 plt.figure()
 plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
 plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
