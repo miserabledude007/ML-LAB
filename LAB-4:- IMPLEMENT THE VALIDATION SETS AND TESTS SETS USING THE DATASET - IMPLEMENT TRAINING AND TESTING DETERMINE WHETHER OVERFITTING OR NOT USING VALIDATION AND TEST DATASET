@@ -1,0 +1,88 @@
+# Ensure TensorFlow 2.x is used
+%tensorflow_version 2.x
+
+# Import required modules
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from matplotlib import pyplot as plt
+pd.options.display.max_rows = 10
+pd.options.display.float_format = "{:.1f}".format
+
+# Load the dataset
+train_df = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/california_housing_train.csv")
+test_df = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/california_housing_test.csv")
+
+# Scale the labels
+scale_factor = 1000.0
+train_df["median_house_value"] /= scale_factor
+test_df["median_house_value"] /= scale_factor
+
+# Define the model building function
+def build_model(my_learning_rate):
+    """Create and compile a simple linear regression model."""
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.layers.Dense(units=1, input_shape=(1,)))
+    model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=my_learning_rate),
+                  loss="mean_squared_error",
+                  metrics=[tf.keras.metrics.RootMeanSquaredError()])
+    return model
+
+# Define the model training function
+def train_model(model, df, feature, label, my_epochs, my_batch_size=None, my_validation_split=0.1):
+    """Feed a dataset into the model in order to train it."""
+    history = model.fit(x=df[feature],
+                        y=df[label],
+                        batch_size=my_batch_size,
+                        epochs=my_epochs,
+                        validation_split=my_validation_split)
+    # Extract epochs and RMSE values
+    epochs = history.epoch
+    hist = pd.DataFrame(history.history)
+    rmse_training = hist["root_mean_squared_error"]
+    rmse_validation = hist["val_root_mean_squared_error"]
+    return epochs, rmse_training, rmse_validation
+
+# Define the plotting function
+def plot_the_loss_curve(epochs, mae_training, mae_validation):
+    """Plot a curve of loss vs. epoch with title and labels."""
+    plt.figure()
+    plt.xlabel("Epoch")
+    plt.ylabel("Root Mean Squared Error")
+    plt.plot(epochs, mae_training, label="Train")
+    plt.plot(epochs, mae_validation, label="Validation")
+    plt.title("Loss")
+    plt.legend()
+    # Plot settings
+    merged_mae_lists = mae_training + mae_validation
+    highest_loss = max(merged_mae_lists)
+    lowest_loss = min(merged_mae_lists)
+    delta = highest_loss - lowest_loss
+    plt.ylim([lowest_loss - (delta * 0.05), highest_loss + (delta * 0.05)])
+    plt.show()
+
+# Hyperparameters and features
+learning_rate = 0.08
+epochs = 70
+batch_size = 100
+validation_split = 0.2
+my_feature = "median_income"
+my_label = "median_house_value"
+
+# Shuffle the training data
+shuffled_train_df = train_df.reindex(np.random.permutation(train_df.index))
+
+# Build and train the model
+my_model = build_model(learning_rate)
+epochs_list, rmse_training, rmse_validation = train_model(my_model, shuffled_train_df, my_feature, my_label, epochs, batch_size, validation_split)
+
+# Plot the loss curve for the final training
+plot_the_loss_curve(epochs_list, rmse_training, rmse_validation)
+
+# Evaluate the model on the test set
+x_test = test_df[my_feature]
+y_test = test_df[my_label]
+results = my_model.evaluate(x_test, y_test, batch_size=batch_size)
+print("Test set evaluation results:")
+print(f"Loss: {results[0]}")
+print(f"Root Mean Squared Error: {results[1]}")
