@@ -3,26 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.datasets import load_iris
-from sklearn.metrics import pairwise_distances_argmin_min
 
-# Load the Iris dataset
-iris = load_iris()
-features = pd.DataFrame(iris.data, columns=iris.feature_names)
+# Load and prepare the Iris dataset
+features = pd.DataFrame(load_iris().data, columns=load_iris().feature_names)
 
 # Apply K-means clustering
-kmeans = KMeans(n_clusters=3, random_state=42)
-cluster_labels = kmeans.fit_predict(features)
+kmeans = KMeans(n_clusters=3, random_state=42).fit(features)
+cluster_labels = kmeans.labels_
 
-# Print the cluster centers
-print("Cluster Centers:")
-print(kmeans.cluster_centers_)
-
-# Find indices of the closest points to the cluster centers
+# Print cluster centers and indices of closest points
+print("Cluster Centers:\n", kmeans.cluster_centers_)
 distances = np.linalg.norm(features.values[:, np.newaxis] - kmeans.cluster_centers_, axis=2)
-closest_indices = np.argmin(distances, axis=0)
-
-print("\nIndices of Closest Points to Cluster Centers:")
-print(closest_indices)
+print("\nIndices of Closest Points to Cluster Centers:\n", np.argmin(distances, axis=0))
 
 # Plot clusters
 plt.figure(figsize=(10, 7))
