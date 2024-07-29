@@ -1,0 +1,52 @@
+import numpy as np
+import pandas as pd
+from sklearn.datasets import fetch_california_housing
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import confusion_matrix, classification_report
+
+# Load the California Housing Dataset
+california_housing = fetch_california_housing()
+X = california_housing.data
+y = california_housing.target
+
+# Convert target variable into binary classification
+threshold = np.median(y)
+y_binary = (y > threshold).astype(int)
+
+# Split the data into training and test sets with stratification to maintain the proportion of classes
+X_train, X_test, y_train, y_test = train_test_split(X, y_binary, test_size=0.2, random_state=42, stratify=y_binary)
+
+# Feature scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Create a KNN classifier with a different number of neighbors
+knn = KNeighborsClassifier(n_neighbors=7)  # Changed from 5 to 7
+# Train the classifier
+knn.fit(X_train_scaled, y_train)
+# Predict labels for the test set
+y_pred = knn.predict(X_test_scaled)
+
+# Calculate confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion matrix")
+print(cm)
+
+# Generate classification report
+report = classification_report(y_test, y_pred, target_names=['Low', 'High'], output_dict=True)
+
+# Print classification report in a formatted way
+print("\nClassification report:")
+print("precision recall f1-score support")
+
+# Print metrics for each class
+for label in ['Low', 'High']:
+    metrics = report[label]
+    print(f"{label} {metrics['precision']:.2f} {metrics['recall']:.2f} {metrics['f1-score']:.2f} {metrics['support']}")
+
+# Print average / total metrics
+avg_total = report['macro avg']
+print(f"avg / total {avg_total['precision']:.2f} {avg_total['recall']:.2f} {avg_total['f1-score']:.2f} {int(avg_total['support'])}")
