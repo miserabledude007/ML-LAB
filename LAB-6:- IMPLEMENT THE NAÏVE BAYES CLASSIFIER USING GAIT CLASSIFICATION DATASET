@@ -6,68 +6,41 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-# For inline plotting
-%matplotlib inline
-
-# Load the Adult dataset from UCI
-# Please replace with the correct path to the dataset
-dataset_url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
-column_names = [
-    'age', 'workclass', 'fnlwgt', 'education', 'education_num', 'marital_status', 
-    'occupation', 'relationship', 'race', 'sex', 'capital_gain', 'capital_loss', 
-    'hours_per_week', 'native_country', 'income'
-]
-
-# Read dataset
-df = pd.read_csv(dataset_url, header=None, names=column_names, na_values=' ?', skipinitialspace=True)
-
-# Drop rows with missing values
-df = df.dropna()
-
-# Convert categorical variables to dummy variables
+# Load and preprocess dataset
+url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
+columns = ['age', 'workclass', 'fnlwgt', 'education', 'education_num', 'marital_status', 
+           'occupation', 'relationship', 'race', 'sex', 'capital_gain', 'capital_loss', 
+           'hours_per_week', 'native_country', 'income']
+df = pd.read_csv(url, header=None, names=columns, na_values=' ?', skipinitialspace=True).dropna()
 df = pd.get_dummies(df)
 
-# Separate features and target variable
+# Split data
 X = df.drop(['income_>50K', 'income_<=50K'], axis=1)
 y = df['income_>50K']
-
-# Split data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
 
-# Train a Gaussian Naive Bayes classifier
-gnb = GaussianNB()
-gnb.fit(X_train, y_train)
-
-# Predict on test set
+# Train and evaluate model
+gnb = GaussianNB().fit(X_train, y_train)
 y_pred = gnb.predict(X_test)
-
-# Model accuracy
 accuracy = accuracy_score(y_test, y_pred)
-print(f'Accuracy score: {accuracy:.4f}')
-
-# Confusion matrix
 cm = confusion_matrix(y_test, y_pred)
-print('\nConfusion matrix\n', cm)
-print(f'\nTrue Positives (TP) = {cm[1, 1]}')
-print(f'True Negatives (TN) = {cm[0, 0]}')
-print(f'False Positives (FP) = {cm[0, 1]}')
-print(f'False Negatives (FN) = {cm[1, 0]}')
 
-# Confusion matrix visualization
-cm_matrix = pd.DataFrame(data=cm, columns=['Actual Positive: 1', 'Actual Negative: 0'],
-                         index=['Predict Positive: 1', 'Predict Negative: 0'])
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
+# Print results
+print(f'Accuracy score: {accuracy:.4f}')
+print('\nConfusion matrix:\n', cm)
+print(f'TP = {cm[1, 1]}, TN = {cm[0, 0]}, FP = {cm[0, 1]}, FN = {cm[1, 0]}')
+
+# Plot confusion matrix
+sns.heatmap(pd.DataFrame(cm, columns=['Actual Positive: 1', 'Actual Negative: 0'],
+                         index=['Predict Positive: 1', 'Predict Negative: 0']),
+            annot=True, fmt='d', cmap='YlGnBu')
 plt.title('Confusion Matrix')
 plt.show()
 
 # Classification report
 print('\nClassification Report:\n', classification_report(y_test, y_pred))
 
-# Calculate and print the classification accuracy manually
-TP = cm[1, 1]
-TN = cm[0, 0]
-FP = cm[0, 1]
-FN = cm[1, 0]
+# Calculate and print classification accuracy manually
+TP, TN, FP, FN = cm[1, 1], cm[0, 0], cm[0, 1], cm[1, 0]
 classification_accuracy = (TP + TN) / float(TP + TN + FP + FN)
-print('Classification accuracy : {0:0.4f}'.format(classification_accuracy))
+print(f'Classification accuracy : {classification_accuracy:.4f}')
