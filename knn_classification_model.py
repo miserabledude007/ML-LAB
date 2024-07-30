@@ -1,40 +1,42 @@
 import ssl
 import urllib.request as req
-import pandas as pd
 import numpy as np
+import pandas as pd
 from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score
 
 # Bypass SSL verification (Not recommended for production)
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# Load and preprocess data
-california_housing = fetch_california_housing()
-X = california_housing.data
-y = (california_housing.target > np.median(california_housing.target)).astype(int)
+# Load California Housing Dataset
+data = fetch_california_housing()
+X = pd.DataFrame(data.data, columns=data.feature_names)
+y = pd.Series(data.target)
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+# Convert regression target to binary classification target
+median_value = y.median()
+y_class = (y > median_value).astype(int)
 
-# Scale features
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y_class, test_size=0.2, random_state=42)
+
+# Standardize features
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+X_val_scaled = scaler.transform(X_val)
 
-# Train and evaluate model
-knn = KNeighborsClassifier(n_neighbors=7)
+# Initialize the KNN classifier
+knn = KNeighborsClassifier(n_neighbors=5)
+
+# Train the classifier
 knn.fit(X_train_scaled, y_train)
-y_pred = knn.predict(X_test_scaled)
 
-# Print confusion matrix and classification report
-print("Confusion matrix\n", confusion_matrix(y_test, y_pred))
-report = classification_report(y_test, y_pred, target_names=['Low', 'High'], output_dict=True)
-print("\nClassification report:")
-print("precision recall f1-score support")
-for label, metrics in report.items():
-    if label in ['Low', 'High']:
-        print(f"{label} {metrics['precision']:.2f} {metrics['recall']:.2f} {metrics['f1-score']:.2f} {metrics['support']}")
-print(f"avg / total {report['macro avg']['precision']:.2f} {report['macro avg']['recall']:.2f} {report['macro avg']['f1-score']:.2f} {int(report['macro avg']['support'])}")
+# Make predictions on the validation set
+y_pred = knn.predict(X_val_scaled)
+
+# Evaluate the classifier
+accuracy = accuracy_score(y_val, y_pred)
+print(f'Accuracy: {accuracy:.2f}')
